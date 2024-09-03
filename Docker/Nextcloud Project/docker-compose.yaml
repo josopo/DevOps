@@ -1,0 +1,71 @@
+version: '3'
+
+services:
+  db:
+    image: mariadb:10.6
+    container_name: nextcloud_db
+    restart: always
+    command: --transaction-isolation=READ-COMMITTED --log-bin=binlog --binlog-format=ROW
+    volumes:
+      - "db:/var/lib/mysql"
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+    networks:
+      - nextcloud_net
+
+  app:
+    image: nextcloud:stable
+    restart: always
+    container_name: nextcloud_app
+    links:
+      - db
+    volumes:
+      - "/var/www/html/nextcloud.config.d:/var/www/html"
+      - "/media/nextcloud_storage:/var/www/html/data" #external volume mounted in the Raspberry PI
+    environment:
+      - MYSQL_PASSWORD=${MYSQL_PASSWOR}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_HOST=${MYSQL_HOST}
+      - NEXTCLOUD_TRUSTED_DOMAINS=${NEXTCLOUD_DOMAIN}
+    networks:
+      - nextcloud_net
+      - traefik_net
+
+  reverse-proxy:
+    # The official v3 Traefik docker image
+    image: traefik:v3.0
+    container_name: reverse-proxy
+    ports:
+      # The HTTP port
+      - "80:80"
+      - "443:443" #HTTPS
+    environment:
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+      - NEXTCLOUD_DOMAIN=${NEXTCLOUD_DOMAIN}
+    networks:
+      - traefik_net
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./traefik/traefik.yaml:/etc/traefik/traefik.yaml:ro"
+      - "./traefik/dynamic/:/etc/traefik/dynamic/:ro"
+      - "traefik-acme:/etc/traefik/acme/"
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10m
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+
+networks:
+  nextcloud_net:
+    external: true
+  traefik_net:
+    external: true
+
+volumes:
+  db:
+  traefik-acme:

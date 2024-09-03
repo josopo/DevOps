@@ -1,0 +1,40 @@
+http:
+  # Add the router
+  routers:
+    nextcloud_app:
+      entryPoints:
+      - https
+      service: nextcloud_app
+      rule: 'Host(`<nextcloud.your-domain.com>`)'
+      middlewares:
+      - redirect-http-to-https
+      tls:
+        certResolver: cloudflare
+        domains:
+          - main: "<your-domain.com>"
+            sans:
+              - "<*.your-domain.com>"
+  # Add the middleware for redirecting HTTP to HTTPS
+  middlewares:
+    redirect-http-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+  # Add the service
+  services:
+    nextcloud_app:
+      loadBalancer:
+        servers:
+          - url: "http://nextcloud_app"
+
+tls:
+  ### If you wish to use your paid SSL Certificates from e.g. DigiCert or GlobalSign###
+  #certificates:
+  #  - certFile: /etc/certs/fullchain.pem
+  #    keyFile: /etc/certs/privkey.pem
+  options:
+    default:
+      sniStrict: true
+      minVersion: "VersionTLS12"
+      maxVersion: "VersionTLS13"
